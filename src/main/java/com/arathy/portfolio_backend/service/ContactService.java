@@ -1,3 +1,4 @@
+
 package com.arathy.portfolio_backend.service;
 
 import com.arathy.portfolio_backend.dto.ContactRequest;
@@ -5,20 +6,21 @@ import com.arathy.portfolio_backend.entity.ContactMessage;
 import com.arathy.portfolio_backend.repository.ContactRepository;
 
 import org.springframework.stereotype.Service;
-import org.springframework.transaction.annotation.Transactional;
 
 @Service
 public class ContactService {
 
     private final ContactRepository contactRepository;
+    private final ResendEmailService resendEmailService;
 
-    // Constructor injection
-    public ContactService(ContactRepository contactRepository) {
+    public ContactService(
+            ContactRepository contactRepository,
+            ResendEmailService resendEmailService
+    ) {
         this.contactRepository = contactRepository;
+        this.resendEmailService = resendEmailService;
     }
 
-    // Save contact message
-    @Transactional
     public ContactMessage saveContactMessage(ContactRequest request) {
 
         ContactMessage contactMessage = new ContactMessage();
@@ -28,6 +30,13 @@ public class ContactService {
         contactMessage.setSubject(request.getSubject().trim());
         contactMessage.setMessage(request.getMessage().trim());
 
-        return contactRepository.save(contactMessage);
+        // First, save the message in PostgreSQL
+        ContactMessage savedMessage =
+                contactRepository.save(contactMessage);
+
+        // Then, send the notification in the background
+        resendEmailService.sendContactNotification(savedMessage);
+
+        return savedMessage;
     }
 }
